@@ -1,0 +1,206 @@
+---
+title: "Prediction Assignment"
+author: "Nikhil"
+date: "October 27, 2016"
+output: html_document
+---
+  
+##1. Synopsis
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks.
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, we will use data recorded from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+More information is available from the website http://groupware.les.inf.puc-rio.br/har[http://groupware.les.inf.puc-rio.br/har] (see the section on the Weight Lifting Exercise Dataset).
+
+The goal of this project is to predict the manner in which the participants did the exercise. This is the classe variable of the training set, which classifies the correct and incorrect outcomes into A, B, C, D, and E categories. This report describes how the model for the project was built, its cross validation, expected out of sample error calculation, and the choices made. It was used successfully to accurately predict all 20 different test cases on the Coursera website.
+
+This document is the write-up submission for the course Practical Machine Learning that is part of Johns Hopkins Data Science Specialization.
+R version used for analysis is "R version 3.3.1 (2016-06-21)". OS used is "x86_64, Windows 10 64 Bit". R Studio version is 0.99.903
+
+##2. Basic settings
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+echo = TRUE  # Make code always visible
+options(scipen = 1)  # Turn off scientific notations for numbers
+```
+
+##3. Loading the libraries
+```{r, cache=TRUE}
+library(RCurl)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+```
+
+##4. Reading the data and doing the preliminary validation
+The training data for this project are available here:
+  https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv]
+
+The test data are available here:
+  https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv]
+
+Let's download the data from the respective links and upload the files into R (using RStudio), interpreting the miscellaneous NA, #DIV/0! and empty fields as NA:
+```{r, cache=TRUE}
+#4.1 Read the data from the URLs given in Project Statement
+trainingData = read.csv(textConnection(getURL("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")), na.strings = c("NA", "#DIV/0!", ""))
+testingData  = read.csv(textConnection(getURL("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")),  na.strings = c("NA", "#DIV/0!", ""))
+```
+Let's have a quick look at the data in terms of structure, no. of observations, number and names of variables, etc.
+```{r, cache=TRUE}
+#4.2 Know more about structure and the data
+str(trainingData)
+
+table(trainingData$classe)
+prop.table(table(trainingData$user_name, trainingData$classe))
+prop.table(table(trainingData$classe))
+```
+
+##5. Cleaning the data
+```{r, cache=TRUE}
+#5.1 Let's start cleaning the data by removing all the unwanted columns
+trainingData = trainingData[,7:160]
+testingData = testingData[,7:160]
+
+#5.2 Remove the NA columns
+naData = apply (!is.na(trainingData), 2, sum) > 19621
+
+trainingData = trainingData[,naData]
+testingData = testingData[,naData]
+
+#5.3 Verify the final structures for the training dataset
+dim(trainingData)
+
+#5.4 Let's split the training set into two for cross validation purposes. We randomly subsample 60% of the set for training purposes (actual model building), while the 40% remainder will be used only for testing, evaluation and accuracy measurement.
+splitUpRows = createDataPartition(y=trainingData$classe,p=0.6, list=FALSE)
+finalTraining = trainingData[splitUpRows,]
+finalTesting = trainingData[-splitUpRows,]
+dim(finalTraining)
+dim(finalTesting)
+
+#5.5 Let's remove the Near Zero Variance columns from both the datasets
+NearZeroVariance_columns=nearZeroVar(finalTraining)
+if (length(NearZeroVariance_columns)>0)
+{
+  finalTraining = finalTraining[,-NearZeroVariance_columns]
+  finalTesting = finalTesting[, -NearZeroVariance_columns]
+}
+
+#5.6 Verify the final structures for both the datasets
+str (finalTraining)
+str (finalTesting)
+```
+
+##6. Manipulating the data
+We still have a lot of variables (53). Hence we try to look at their relative importance using the output of a quick Random Forest algorithm (which we call directly using randomForest()), and plotting data importance using varImpPlot():
+```{r, cache=TRUE}
+#6.1 Create random forest model
+rfModel = randomForest(classe~.,data=finalTraining,importance=TRUE, ntree=100)
+varImpPlot(rfModel)
+```
+  
+Using the varImpPlot output (Accuracy and Gini graphs above), we select the top 10 variables to use for model building. If the accuracy of the resulting model is acceptable, limiting the number of variables is a good idea to ensure readability and interpretability of the model. A model with 10 parameters is certainly user friendly and with less overheads than a model with 53 parameters.
+
+The 10 covariates we finalize using the above 2 graphs are `yaw_belt`, `roll_belt`, `num_window`, `pitch_belt`, `magnet_dumbbell_y`, `magnet_dumbbell_z`, `pitch_forearm`, `accel_dumbbell_y`, `roll_arm`, and `roll_forearm`.
+
+Let's analyze the correlations between these 10 variables. The code below calculates the correlation matrix, replaces the 1s in the diagonal with 0s, and outputs which variables have an absolute value correlation above 75%:
+
+```{r, cache=TRUE}
+#6.2 Verify the corelation among the selected 10 variables
+corr = cor(finalTraining[,c("yaw_belt", "roll_belt", "num_window", "pitch_belt", "magnet_dumbbell_z", "magnet_dumbbell_y", "pitch_forearm", "accel_dumbbell_y", "roll_arm", "roll_forearm")])
+diag(corr) = 0
+which(abs(corr)>0.75,arr.ind = TRUE)
+```
+The two varaibles `roll_belt` and `yaw_belt` are having a very high correlation (> 75%) with each other. We may encounter challenges during modelling and predictions stage.
+```{r, cache=TRUE}
+#6.3 Verify and plot the correlation and relationship between roll_belt and yaw_belt variables
+cor(finalTraining$roll_belt, finalTraining$yaw_belt)
+qplot (roll_belt, magnet_dumbbell_y,colour=classe, data=finalTraining)
+```
+  
+The graph above helps us to identify relationship between `roll_belt` and `magnet_dumbbell_y` variables. It suggests that we can probably bucket the data into groups based on `roll_belt` values. Subsequently, a quick tree classifier (shown below) selects `roll_belt` as the first discriminant among all 53 covariates.
+
+```{r, cache=TRUE}
+#6.4 Plot the Decision Tree
+fitModel = rpart(classe~., data=finalTraining, method="class")
+fancyRpartPlot(fitModel)
+```
+  
+Let's not investigate tree classifiers further as the Random Forest algorithm is proving satisfactory.
+
+##7. Modelling and Prediction
+Let's create our model using Random Forest algorithm by using the train() function from the caret package.
+We will use all the selected variables (except the `yaw_belt` varaible as `yaw_belt` and `roll_belt` variables are highly correlated with a correlation of 0.8139997). These variable are relatively independent as the maximum correlation among them is 50.57%.
+
+We will use a 2-fold cross-validation control. This is the simplest k-fold cross-validation possible. Because the data set is large, using a small number of folds is justified.
+
+```{r, cache=TRUE}
+#7.1 Create the final model
+finalModel = train(classe~roll_belt+num_window+pitch_belt+magnet_dumbbell_y+magnet_dumbbell_z+pitch_forearm+accel_dumbbell_y+roll_arm+roll_forearm,
+                   data=finalTraining,
+                   method="rf",
+                   trControl=trainControl(method="cv",number=2),
+                   prox=TRUE,
+                   verbose=TRUE,
+                   allowParallel=TRUE)
+```
+Since the above modelling process is time consuming, we will save the already created model for future usage using `saveRDS` command. We can always use this model again directly by allocating it to a variable using the `readRDS` command.
+```{r, cache=TRUE}
+#7.2 Save and read it for future usage
+saveRDS(finalModel, "finalModel.rds")
+finalModel=readRDS("finalModel.rds")
+```
+#### Accuracy of the model
+Let's apply the model generated using training data to testing data and check the accuracy of the built model.We can achieve this by using `confusionMatrix()` function from `caret` package.
+```{r, cache=TRUE}
+#7.3 Compare the predictions and measure the accuracy
+predictions=predict(finalModel, newdata=finalTesting)
+cMatrix = confusionMatrix(predictions, finalTesting$classe)
+cMatrix
+```
+The accuracy of our models (99.63%) seems to be pretty impressive which totally validates the idea / hypothesis we made to keep and use only 9 relatively independent covariates to build the model.
+
+#### Estimation of the outliers error rate
+The testing dataset is separated and left untouched during the whole modelling process. Hence this testing subdataset provides an unbiased estimate of the Random Forest algorithm's prediction accuracy (99.63% as calculated above). The Random Forest's outliers' error rate is derived by the formula 100% - Accuracy = 0.37%, or can be calculated directly by the following lines of code:
+```{r, cache=TRUE}
+outliersClass = function(values, predicted)
+{
+  sum(predicted!=values)/length(values)
+}
+
+outliersErrRate = outliersClass(finalTesting$classe, predictions)
+outliersErrRate
+```
+
+##8. Final Subision
+Let's predict the classification of the 20 observations of the testing data set mentioned in Project Statement.
+```{r, cache=TRUE}
+predictions = predict(finalModel, newdata=testingData)
+testingData$classe = predictions
+```
+We create one .CSV file with all the results, presented in two columns (named problem_id and classe) and 20 rows of data:
+```{r, cache=TRUE}
+submit = data.frame(problem_id = testingData$problem_id, classe = predictions)
+write.csv(submit, file = "predictions-assignment-submission.csv", row.names = FALSE)
+```
+We also create 20 .TXT files, to be uploded one by one in the website (the 20 files created are called problem_1.txt to problem_20.txt):
+```{r, cache=TRUE}
+finalAnswers = testingData$classe
+writeSubmissionFile = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_",i,".txt")
+    write.table(x[i], file=filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
+  }
+}
+writeSubmissionFile(finalAnswers)
+```
+
+##9. Conclusion
+In this assignment, we accurately predicted the classification of 20 observations using a Random Forest algorithm trained on a subset of data using less than 20% of the covariates.
+
+The accuracy obtained (accuracy = 99.63%, and out-of-sample error = 0.37%) is obviously highly suspicious as it is never the case that machine learning algorithms are that accurate, and a mere 85% if often a good accuracy result.
+
+It may be interesting to apply the `rfModel` tree from the Random Forest algorithm obtained (without any re-calibration) to a completely new set of participants, to complement and validate the analysis (testing dataset).

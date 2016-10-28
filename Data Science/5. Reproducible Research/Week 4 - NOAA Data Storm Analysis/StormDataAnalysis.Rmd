@@ -1,0 +1,220 @@
+---
+title: Economic and Human Impact of Storms and other Weather Events in the United
+  States
+output:
+  pdf_document: default
+  html_document:
+    keep_md: yes
+---
+
+### 1. Synopsis 
+This assignment uses NOAA (National Oceanic & Atmospheric Administration) Storm Database for analysis purpose. The source used for this analysis was picked from here - https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2 and analysis period is between 1950 and November 2011. The database contains characteristics of Major weather events in the United States of America. This assignment fetches that data, cleans it up, organizes it, and then aggregate the following - 1. Most harmful events to human population health. 2. Events that have greatest economic consequences.
+
+The conclusion is that the Tornadoes & Excessive Heat and Tornadoes & Thunderstorm Winds are the most harmful events to human population health from Fatalities and Injuries perspective respectively. Similarly, Floods & Hurricane - Typhoons, Droughts & Floods and Floods and Hurricane - Typhoons are the events having greatest economic consequences from Property Damages, Crop Damages and Overall Damages perspective respectively. It is also concluded that events harmful to human health are not at all correlated to events with economic consequences.
+
+R version used for analysis is "R version 3.3.1 (2016-06-21)". OS used is "x86_64, Linux-gnu".
+
+### 2. Basic settings
+```{r}
+echo = TRUE  # Make code always visible
+options(scipen = 1)  # Turn off scientific notations for numbers
+```
+
+### 3. Loading Libraries
+Load all the needed libraries for data extraction, caching, processing data, and plotting graphs
+```{r}
+library(R.cache)
+library(R.utils)
+library(dplyr)
+library(ggplot2)
+```
+
+### 4. Downloading and extracting files
+```{r, cache=TRUE}
+# 4.1. Check if data directory exists or create it
+if(!file.exists("./data"))
+{
+      dir.create("./data")
+}
+
+# 4.2. Check if the zip file exists or download it
+if(!file.exists("./data/StormData.csv.bz2"))
+{
+    fileUrl = "https://d396qusza40orc.cloudfront.net/repdata/data/StormData.csv.bz2"
+    destPath = "./data/StormData.csv.bz2"
+    download.file(fileUrl, destPath)
+}
+
+# 4.3. Check if CSV file exists or extract it from zip
+if(!file.exists("./data/StormData.csv"))
+{
+    filePath = "./data/StormData.csv.bz2"
+    destPath = "./data/StormData.csv"
+    bunzip2(filePath, destPath, remove=FALSE)
+}
+```
+### 5. Data Processing
+```{r, cache=TRUE}
+# 5.1. Load the CSV files as raw data
+rawStormData = read.csv("./data/StormData.csv", header = TRUE, sep = ",")
+
+# 5.2. Verify the structure and dimensions of raw data frame
+str(rawStormData)
+head(rawStormData)
+```
+
+The columns required for further analysis and answering our queries are:
+  BGN_DATE      Beginning Date (to decide the threshold or starting year)
+	EVTYPE				Event Type
+	FATALITIES		Number of human fatalities due to event
+	INJURIES			Number of human injuries due to event
+	PROPDMG				Property Damage in USD
+	PROPDMGEXP		Magnitude of Property Damage (Thousands, Millions) USDs
+	CROPDMG				Crop Damage in USD
+	CROPDMGEXP		Magnitude of Crop Damage (Thousands, Millions) USDs
+```{r, cache=TRUE}
+# 5.3. Remove the unwanted columns from raw data frame
+columnsRequired = c("BGN_DATE", "EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
+modStormData = rawStormData[, columnsRequired]
+
+# 5.4. Verify if there is NA in data
+sum(is.na(modStormData))
+
+# 5.5. Convert the EVTTYPE, PROPDMGEXP and CROPDMGEXP data into upper case for further usage
+modStormData$EVTYPE=toupper(modStormData$EVTYPE)
+modStormData$PROPDMGEXP = toupper(modStormData$PROPDMGEXP)
+modStormData$CROPDMGEXP = toupper(modStormData$CROPDMGEXP)
+```
+
+By looking at the event types, it is understood that the Event Type data has to be cleaned up for better results and understanding,
+e.g.: “TSTM WIND”, “TSTM WIND (G40)”" and “MARINE TSTM WIND” 
+These are the events same as “MARINE THUNDERSTORM WIND” but with different descriptions. Such event types are documented in the page 6 of the storm data documentation (https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf), so it needs to clean the dataset and combine the same types of events following the table on page 6 of the documentation.
+
+```{r, cache=TRUE}
+# 5.6. Factor the EVTTYPE to avoid duplicates and arrive at the correct measures
+modStormData[modStormData$EVTYPE == "HURRICANE/TYPHOON", "EVTYPE"] = "HURRICANE-TYPHOON"
+modStormData[modStormData$EVTYPE == "HURRICANE", "EVTYPE"] = "HURRICANE-TYPHOON"
+modStormData[modStormData$EVTYPE == "RIVER FLOOD", "EVTYPE"] = "FLOOD"
+modStormData[modStormData$EVTYPE == "THUNDERSTORM WINDS", "EVTYPE"] = "THUNDERSTORM WIND"
+modStormData[modStormData$EVTYPE == "TSTM WIND", "EVTYPE"] = "THUNDERSTORM WIND"
+modStormData[modStormData$EVTYPE == "URBAN/SML STREAM FLD", "EVTYPE"] = "HEAVY RAIN"
+modStormData[modStormData$EVTYPE == "MARINE TSTM WIND", "EVTYPE"] = "MARINE THUNDERSTORM WIND"
+modStormData[modStormData$EVTYPE == "WILD/FOREST FIRE", "EVTYPE"] = "WILDFIRE"
+modStormData[modStormData$EVTYPE == "marinethunderstormwind/hail", "EVTYPE"] = "MARINE THUNDERSTORM WIND"
+modStormData[modStormData$EVTYPE == "TSTM WIND/HAIL", "EVTYPE"] = "MARINE THUNDERSTORM WIND"
+modStormData[modStormData$EVTYPE == "flashflooding", "EVTYPE"] = "FLASH FLOOD"
+modStormData[modStormData$EVTYPE == "FLOOD/FLASH FLOOD", "EVTYPE"] = "FLASH FLOOD"
+modStormData[modStormData$EVTYPE == "WINTER data/MIX", "EVTYPE"] = "WINTER data"
+modStormData[modStormData$EVTYPE == "RIP CURRENTS", "EVTYPE"] = "RIP CURRENT"
+modStormData[modStormData$EVTYPE == "DENSEDENSEFOG", "EVTYPE"] = "DENSE FOG"
+modStormData[modStormData$EVTYPE == "STRONG WINDS", "EVTYPE"] = "ASTROMICAL LOW TIDE"
+modStormData[modStormData$EVTYPE == "COASTAL FLOODING", "EVTYPE"] = "COASTAL FLOOD"
+modStormData[modStormData$EVTYPE == "RECORD WARMTH", "EVTYPE"] = "HEAT"
+modStormData[modStormData$EVTYPE == "RECORD HEAT", "EVTYPE"] = "HEAT"
+modStormData[modStormData$EVTYPE == "FREEZE", "EVTYPE"] = "FROST/FREEZE"
+modStormData[modStormData$EVTYPE == "HEATWAVE", "EVTYPE"] = "EXCESSIVE HEAT"
+```
+Finalize the Cut Off Year (if not 1950) based on the details provided in Assignment Statement ("The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.)".
+```{r, cache=TRUE}
+# 5.7. Find the Cut Off Year to include the most recent data
+totalNumberOfObservations = nrow(modStormData)
+cutOffPercentage = 0.75
+cutOffObservations = round(totalNumberOfObservations * cutOffPercentage)
+
+# 5.7.1. add columns for date calculations based on BGN_DATE
+modStormData$year = as.numeric(format(as.Date(modStormData$BGN_DATE, format = "%m/%d/%Y"), "%Y"))
+
+# 5.7.2. create dataset with count per year, reverse the recordset, create running total
+yearRecords = as.data.frame(table(modStormData$year))
+yearRecords[order(yearRecords$Var1, decreasing = TRUE), ]
+yearRecords$runningTotal = cumsum(yearRecords$Freq)
+yearRecords$Var1=as.numeric(as.character(yearRecords$Var1))
+cutOffYear = min(yearRecords[yearRecords$runningTotal < cutOffObservations, 1])
+
+modStormData = modStormData[modStormData$year >= cutOffYear, ]
+endYear = max(modStormData$year)
+```
+
+### 6. Results
+```{r, cache=TRUE}
+# 6.1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+# 6.1.1. finding the worst injuries
+injStats = aggregate(INJURIES~EVTYPE, data = modStormData, sum)
+# exclude the results with zero injuries
+injStats = injStats [injStats$INJURIES>0,]
+# arrange the results in descending order to find worst 10 results
+injDescr = injStats [order(injStats$INJURIES, decreasing = TRUE),]
+head (injDescr, n=10)
+
+# 6.1.2. finding the worst fatalities
+fatStats = aggregate(FATALITIES~EVTYPE, data = modStormData, sum)
+# exclude the results with zero fatalities
+fatStats = fatStats [fatStats$FATALITIES>0,]
+# arrange the results in descending order to find worst 10 results
+fatDescr = fatStats [order(fatStats$FATALITIES, decreasing = TRUE),]
+head (fatDescr, n=10)
+
+# 6.1.3. plot the graphs for 10 worst injuries and fatalities
+barplot(fatDescr[1:10, 2], col = rainbow(10), legend.text = fatDescr[1:10, 1], ylab = "Fatality", main = "Top 10 events that caused most Fatalities")
+
+barplot(injDescr[1:10, 2], col = rainbow(10), legend.text = injDescr[1:10, 1], ylab = "Injuries", main = "Top 10 events that caused most Injuries")
+
+# 6.2. Across the United States, which types of events have the greatest economic consequences?
+```
+
+
+```{r, cache=TRUE}
+# 6.2.1. Converting the Damages to absolute amounts
+# find out the Exposure Symbols used for Property and Crop Damage Exponential
+unique(c(unique(modStormData$PROPDMGEXP),unique(modStormData$CROPDMGEXP)))
+# create the vector of the Exposure Symbols used for Property and Crop Damage Exponential
+ExpSymb = c("", "+", "-", "?", 0:9, "H", "K", "M", "B")
+# create the vector of the Exponential Power corresponding to each Exponential Symbols
+ExpMultiplier = c(0, 0, 0, 0, 0:9, 2, 3, 6, 9)
+# create a data frame combining Exponential Symbols and their multiplying powers
+ExpPower = data.frame (ExpSymb, ExpMultiplier)
+# calculate the actual Property Damage Amount using the Damage Amount and Exponential Symbol's Power
+modStormData$PROPDMG = modStormData$PROPDMG * 10 ^ ExpPower[match(modStormData$PROPDMGEXP, ExpPower$ExpSymb), 2]
+# calculate the actual Crop Damage Amount using the Damage Amount and Exponential Symbol's Power
+modStormData$CROPDMG = modStormData$CROPDMG * 10 ^ ExpPower[match(modStormData$CROPDMGEXP, ExpPower$ExpSymb), 2]
+# calculate the actual Total Damage Amount as sum of Property Damage and Crop Damage Amounts
+modStormData$TotalDamage = modStormData$PROPDMG + modStormData$CROPDMG
+
+# 6.2.2. finding the worst Property Damages
+PropDamage = aggregate(PROPDMG~EVTYPE, data = modStormData, sum)
+# exclude the results with zero fatalities
+PropDamage = PropDamage [PropDamage$PROPDMG>0,]
+# quantify the results in billions
+PropDamage$PROPDMG = PropDamage$PROPDMG / 1000000000
+# arrange the results in descending order to find worst 10 results
+PropDamage = PropDamage[order(PropDamage$PROPDMG, decreasing = TRUE),]
+head (PropDamage, n=10)
+
+# 6.2.3. finding the worst Crop Damages
+CropDamage = aggregate(CROPDMG~EVTYPE, data = modStormData, sum)
+# exclude the results with zero fatalities
+CropDamage = CropDamage [CropDamage$CROPDMG>0,]
+# quantify the results in billions
+CropDamage$CROPDMG = CropDamage$CROPDMG / 1000000000
+# arrange the results in descending order to find worst 10 results
+CropDamage = CropDamage[order(CropDamage$CROPDMG, decreasing = TRUE),]
+head (CropDamage, n=10)
+
+# 6.2.4. finding the worst overall Damages
+EconomicDamage = aggregate(TotalDamage~EVTYPE, data = modStormData, sum)
+# exclude the results with zero fatalities
+EconomicDamage = EconomicDamage [EconomicDamage$TotalDamage>0,]
+# quantify the results in billions
+EconomicDamage$TotalDamage = EconomicDamage$TotalDamage / 1000000000
+# arrange the results in descending order to find worst 10 results
+EconomicDamage = EconomicDamage[order(EconomicDamage$TotalDamage, decreasing = TRUE),]
+head (EconomicDamage, n=10)
+
+# 6.2.4. plotting the graphs for the results above
+#barplot(PropDamage[1:10, 2], col = rainbow(10), legend.text = PropDamage[1:10, 1], ylab = "Property Damage (in Billions)", main = "Top 10 events that caused most Property Damage")
+
+#barplot(CropDamage[1:10, 2], col = rainbow(10), legend.text = CropDamage[1:10, 1], ylab = "Crop Damage (in Billions)", main = "Top 10 events that caused most Crop Damage")
+
+barplot(EconomicDamage[1:10, 2], col = rainbow(10), legend.text = EconomicDamage[1:10, 1], ylab = "Total Damage (in Billions)", main = "Top 10 events that caused most overall Damage")
+```

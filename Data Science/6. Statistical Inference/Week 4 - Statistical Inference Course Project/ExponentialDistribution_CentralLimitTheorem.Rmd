@@ -1,0 +1,88 @@
+---
+title: Exponential Distribution and Central Limit Theorem Simulation Exercise
+Author: Nikhil B.
+output:
+  pdf_document: default
+  html_document:
+    keep_md: yes
+---
+
+### 1. Synopsis
+R version used for analysis is "R version 3.3.1 (2016-06-21)". OS used is "x86_64, Windows 10 64 Bit".
+
+### 2. Basic settings
+```{r}
+echo = TRUE  # Make code always visible
+options(scipen = 1)  # Turn off scientific notations for numbers
+```
+
+### 3. Setting the initial parameters
+```{r, cache=TRUE}
+lambda = 0.2 # setting the laambda parameter as per assignment statement
+noExp = 40 # number of exponentials
+noSim = 1000 # 10k simulations
+```
+
+### 4. Generating and plotting Exponential Distribution
+```{r, cache=TRUE}
+# 4.1 Generating and plotting Exponential Distribution
+dsExp = rexp (10000, lambda)
+
+#4.2 Exponential Distribution mean calculation
+vectMeans = NULL
+for (i in 1:noSim) vectMeans = c (vectMeans, mean (rexp(noExp, lambda)))
+```
+Please refer to "The exponential distribution with lambda=0.5 and 10,000 observations" and "Exponential Distribution's mean distribution" graphs in "Appendix A" for further clarity.
+
+### 5. Questions and Results
+# 5.1 Sample Mean versus Theoretical Mean
+```{r, cache=TRUE}
+# 5.1 Generating and plotting Exponential Distribution
+print (paste ("Actual mean is", round(mean(vectMeans),2)))
+print (paste ("Theoretical mean is", (1/lambda)))
+```
+As Central Limit Theorem suggests theoretical mean is equal to (1/lambda) = 1/ 0.2 = 5. Actual mean is 5.02. This confirms the Actual Mean is almost same as Theoretical Mean with minor difference.
+
+Please refer to "Theoretical Mean vs Actual Mean for Exponential Distribution" graph in "Appendix" for further clarity.
+
+# 5.2 Sample Variance versus Theoretical Variance
+```{r, cache=TRUE}
+# 5.2 Sample Variance versus Theoretical Variance
+print (paste ("Actual Variance is", var(vectMeans)))
+print (paste ("Theoretical Variance is", "((1/",lambda,")^2)/",noExp,"=",(((1/lambda)^2)/noExp)))
+```
+As Central Limit Theorem suggests variance of sample means is equal to theoretical variance/sample size = ((1/lambda)^2)/noExp. Variance of sample means therefore equals to 0.625. By our experiment, we found that there is a slight difference starting at third digit between Actual and Theoretical Variances of the referred  Exponential Distribution.
+
+# 5.3 Is the distribution of means normal?
+```{r, cache=TRUE}
+# 5.3 Is the distribution of means normal?
+```
+Please refer to "Exponential and Normal Distribution" in "Appendix" for further clarity. As confirmed in the referred graph, the calculated distribution of means of random sampled Exponantial Distributions overlaps with the Normal Distribution, due to the Central Limit Theorem. The more samples we would get (now 10,000), the closer will the density distribution be to the normal distribution bell curve.
+
+### 6. Appendix
+```{r, cache=TRUE}
+par(mfrow=c(2,2))
+
+plot (dsExp, pch=19, cex=0.6, 
+      main=paste("The exponential distribution \nwith ",
+        "lambda=",lambda,"and \n10,000 observations",sep=" "),
+      ylab="rexp (10000, lambda)")
+
+hist (vectMeans, col="yellow", 
+      main="Exponential Distribution's \nmean distribution", 
+      breaks = 40, xlab="Means")
+rug (vectMeans)
+
+hist(vectMeans, col="red", 
+     main="Theoretical Mean vs \nActual Mean for \nExponential Distribution",
+     breaks=20, xlab="Means")
+abline(v=mean(vectMeans), lwd="4", col="green")
+text(3.6, 100, 
+     paste("Actual Mean = ", 
+           round(mean(vectMeans),2), 
+           "\n Theoretical mean = 1/", 
+           lambda, "=", (1/lambda)), col="blue")
+
+hist(vectMeans, prob=TRUE, col="lightblue", main="Exponential and Normal Distribution", breaks=40)
+lines(density(vectMeans), lwd=3, col="red", xlab="Means")
+```

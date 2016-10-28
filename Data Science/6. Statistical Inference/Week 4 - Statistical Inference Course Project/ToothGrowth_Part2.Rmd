@@ -1,0 +1,129 @@
+---
+title: Tooth Growth Data - Part 2
+Author: Nikhil B.
+output:
+  pdf_document: default
+  html_document:
+    keep_md: yes
+---
+
+## 1. Synopsis
+R version used for analysis is "R version 3.3.1 (2016-06-21)". OS used is "x86_64, Windows 10 64 Bit".
+
+## 2. Basic settings
+```{r}
+echo = TRUE  # Make code always visible
+options(scipen = 1)  # Turn off scientific notations for numbers
+```
+
+## 3. Loading the libraries and data
+```{r, cache=TRUE}
+library(datasets)
+library(ggplot2)
+data("ToothGrowth")
+```
+
+## 4. Exploratory Data Analysis and Summary of data
+```{r, cache=TRUE}
+# check the dataset structure
+str (ToothGrowth)
+
+#check the number of rows in dataset
+nrow (ToothGrowth)
+
+#check the header rows
+head (ToothGrowth)
+
+#check the footer rows
+tail (ToothGrowth)
+
+#check the dataset summary
+summary (ToothGrowth)
+
+ToothGrowth$dose<-as.factor(ToothGrowth$dose)
+
+# check the summary of cases between different dose levels and delivery methods
+table(ToothGrowth$dose, ToothGrowth$supp)
+
+# tooth length vs Dose plot
+p = ggplot(aes(x=dose, y=len), data=ToothGrowth) + geom_boxplot(aes(fill=dose))
+p = p + ggtitle("Plot of length \n by dose")
+p = p + xlab("Dose (mg)") + ylab("Teeth length")
+p
+
+p = ggplot(aes(x=supp, y=len), data=ToothGrowth) + geom_boxplot(aes(fill=supp))
+p = p + ggtitle("Plot of length \n by supplement")
+p = p + xlab("Supplement") + ylab("Teeth length")
+p
+```
+
+## 5. Statistical Inferential Analysis
+### 5.1 Supplement as a factor
+```{r, cache=TRUE}
+# check for group differences due to different supplement type 
+# assuming unequal variances between the two groups
+t.test(len ~ supp, data = ToothGrowth)
+```
+
+The p-value is 0.06 and confidence interval of [-0.171, 7.571] does not allow us to reject the null hypothesis (that there is no correlation between delivery method and tooth length).
+
+### 5.2 Dosage as a factor
+```{r, cache=TRUE}
+# first create three sub-groups as per dose level pairs
+ToothGrowth.dose1 = subset (ToothGrowth, dose %in% c(0.5, 1.0)) 
+ToothGrowth.dose2 = subset (ToothGrowth, dose %in% c(0.5, 2.0)) 
+ToothGrowth.dose3 = subset (ToothGrowth, dose %in% c(1.0, 2.0)) 
+
+# Check for group differences due to different dose levels (0.5, 1.0)
+# assuming unequal variances between the two groups
+t.test(len ~ dose, data = ToothGrowth.dose1)
+```
+
+```{r, cache=TRUE}
+# Check for group differences due to different dose levels (0.5, 2.0)
+# assuming unequal variances between the two groups
+t.test(len ~ dose, data = ToothGrowth.dose2)
+```
+
+```{r, cache=TRUE}
+# Check for group differences due to different dose levels (1.0, 2.0)
+# assuming unequal variances between the two groups
+t.test(len ~ dose, data = ToothGrowth.dose3)
+```
+
+The confidence intervals ([-11.98, -6.276] for doses 0.5 and 1.0, [-18.16, -12.83] for doses 0.5 and 2.0, and [-8.996, -3.734] for doses 1.0 and 2.0) allow for the rejection of the null hypothesis and a confirmation that there is a significant correlation between tooth length and dose levels.
+
+### 5.3 Considering Supplement as a Factor within the Dose levels
+
+
+Analyzing the ddata for correlation between dose level and change in tooth growth within each dose level:
+```{r, cache=TRUE}
+ToothGrowth.dose4 <- subset(ToothGrowth, dose == 0.5)
+ToothGrowth.dose5 <- subset(ToothGrowth, dose == 1.0)
+ToothGrowth.dose6 <- subset(ToothGrowth, dose == 2.0)
+
+t.test(len ~ supp, data = ToothGrowth.dose4)
+
+t.test(len ~ supp, data = ToothGrowth.dose5)
+
+t.test(len ~ supp, data = ToothGrowth.dose6)
+```
+
+The confidence intervals for dose levels 0.5mg and 1.0mg([1.72, 8,78] within 0.5mg, [2.80, 9.06] within 1.0mg) allow for the rejection of the null hypothesis and a confirmation that there is a significant correlation between tooth length and dose levels. However, the confidence interval for dose level 2.0[-3.80, 3.64] is not enough to reject the null hypothesis.
+
+## 6. Conclusions and Assumptions
+
+To make conclusions with the data in this dataset, we must assume that  
+   *1. The poplulations are independent  
+   2. The variances between populations are different    
+   3. A random population was used    
+   4. The population was comprised of similar guinea pigs  
+   5. Measurement error was accounted for with significant digits  
+   6. & double blind research methods were used. For the populations to be independent, 60 guinea pigs would have to be used so each combination of dose level and delivery method were not affected by the other methods. To ensure double blind research methods are followed, the researchers taking the measurements must have been unaware of which guinea pigs were given which dose level or delivery method. The guinea pigs must also be unaware that they are being given a specific treatment  
+   7. For the t-tests, the variances are assumed to be different for the two groups being compared. This assumption is less stronger than the case in which the variances are assumed to be equal  *
+
+If all the preceding assumptions are true, we may infer that  
+   *1. there is a significant difference between tooth length and dose levels across both delivery methods  
+   2. A higher dose level consistently led to longer teeth  
+   3. Initially it appeared that the delivery method had no significant impact on tooth length, but when controlling for dose level we discovered that there was a significant difference at 0.5mg and 1.0mg, but not at 2.0mg  
+   4. Based on the above conclusion, it appears that orange juice is a better delivery method with a larger impact on tooth length for a given dose of Vitamin C, but above a maximum dose level there is no further improvement  *
