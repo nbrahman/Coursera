@@ -83,5 +83,8 @@ shinyServer(function(input, output) {
 
 Shiny application is deployed at https://nbrahman.shinyapps.io/week4_assignment/
 
-The source code is available at 
+The Shiny app source code is available at https://github.com/nbrahman/Coursera/tree/master/Data%20Science/9.%20Developing%20Data%20Products/Week%204%20-%20Shiny%20Application%20and%20Reproducible%20Pitch/week4_assignment
+
+The presentation source code is available at https://github.com/nbrahman/Coursera/tree/master/Data%20Science/9.%20Developing%20Data%20Products/Week%204%20-%20Shiny%20Application%20and%20Reproducible%20Pitch
+
 
