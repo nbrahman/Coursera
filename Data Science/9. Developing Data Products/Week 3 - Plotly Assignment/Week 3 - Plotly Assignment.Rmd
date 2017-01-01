@@ -1,0 +1,119 @@
+---
+title: Exponential Distribution and Central Limit Theorem Simulation Exercise
+author: "Nikhil"
+date: "December 20, 2016"
+output: ioslides_presentation
+---
+
+```{r, include=FALSE}
+echo = TRUE  # Make code always visible
+options(scipen = 1)  # Turn off scientific notations for numbers
+library (plotly)
+# Check if data directory exists or create it
+if(!file.exists("./data"))
+{
+      dir.create("./data")
+}
+
+# Check if the zip file exists or download it
+if(!file.exists("./data/activity.zip"))
+{
+    fileUrl = "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+    destPath = "./data/activity.zip"
+    download.file(fileUrl, destPath)
+}
+
+# Check if CSV file exists or extract it from zip
+if(!file.exists("./data/activity.csv"))
+{
+    unzip("activity.zip")
+}
+
+# Load the data (i.e. read.csv())
+activity_data <- read.csv("./data/activity.csv", colClasses = c("integer", "Date", "factor"))
+
+# Process/transform the data (if necessary) into a format suitable for your analysis
+str(activity_data)
+head(activity_data)
+activity_data$month <- as.Date(activity_data$date, "%Y-%m-%d")
+head(activity_data)
+dim(activity_data)
+library(grid)
+```
+
+## 1. What is mean total number of steps taken per day?
+```{r, cache=TRUE, message=FALSE}
+#1.1 Calculate the total number of steps taken per day
+steps <- aggregate (steps~date, activity_data, FUN=sum, na.action=na.omit)
+
+# 1.2. Make a histogram of the total number of steps taken each day
+p=plot_ly(type = "histogram", x=steps$steps, 
+          hoverinfo=text)%>%
+  layout(title="Histogram of Total Number of Steps",
+            bargap= 0.015,
+            xaxis=list(title="Number of Steps"),
+            yaxis=list(title="Frequency"))
+```
+
+## 
+```{r, cache=TRUE, message=FALSE}
+p
+```
+
+## 
+```{r, cache=TRUE, message=FALSE}
+# 1.3. Calculate and report the mean and median of the total number 
+# of steps taken per day
+mean(steps$steps,na.rm=TRUE)
+median(steps$steps,na.rm=TRUE)
+```
+
+## What is the average daily activity pattern?
+```{r, cache=TRUE}
+# 1. Make a time series plot (i.e. type = "l") of the 5-minute 
+# interval (x-axis) and the average number of steps taken, 
+# averaged across all days (y-axis)
+intervalMean <- aggregate (x=list(steps=activity_data$steps),
+    by=list(interval=as.numeric(as.character(activity_data$interval))), 
+    FUN=mean, na.rm=TRUE)
+p=plot_ly(x=intervalMean$interval, y=intervalMean$steps, type="scatter", 
+          mode="lines")%>%
+  layout(title="Average number of steps for each 5 minute interval",
+            xaxis=list(title="5 minute interval"),
+            yaxis=list(title="Averages number of steps"))
+```
+## 
+```{r, cache=TRUE}
+p
+```
+
+## 
+```{r}
+#2. Which 5-minute interval, on average across all the days in the 
+# dataset, contains the maximum number of steps?
+intervalMean[which.max(intervalMean$steps),]
+```
+
+```{r, include=FALSE}
+#1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+sum(is.na(activity_data$steps))
+
+#2. Devise a strategy for filling in all of the missing values in the dataset.
+# The strategy does not need to be sophisticated. For example, you could 
+# use the mean/median for that day, or the mean for that 5-minute 
+# interval, etc. 
+#3. Create a new dataset that is equal to the original dataset 
+# but with the missing data filled in.
+activity_data_modified <- activity_data
+for (i in seq(0,2355,5))
+{
+    idx <- which(activity_data_modified$interval == i & is.na(activity_data_modified$steps))
+    activity_data_modified[idx, "steps"] <- intervalMean[intervalMean$interval == i, "steps"]
+}
+sum(is.na(activity_data_modified$steps))
+
+#4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+newSteps <- aggregate (steps~date, activity_data_modified, FUN=sum)
+```
+
+##Thank you {.flexbox .vcenter}

@@ -1,0 +1,25 @@
+---
+title: "Developing Data Products Week 2 Assignment"
+author: "Nikhil"
+date: "December 13, 2016"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+if(!require(leaflet)) install.packages("leaflet") 
+```{r}
+library(leaflet)
+
+m <- leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addMarkers(lat=41.8986, lng=-87.6236, popup="Chicago Cheesecake Factory") %>%
+  addMarkers(lat=41.8827, lng=-87.6233, popup="Chicago Bean / Cloud Gate") %>%
+  addMarkers(lat=40.6892, lng=-74.0445, popup="Statue of Liberty") %>%
+  addMarkers(lat=18.9220, lng=72.8347, popup="Gateway of India, Mumbai") %>%
+  addMarkers(lat=55.7520, lng=37.6175, popup="Kremlin Square, Moscow") %>%
+  addMarkers(lat=38.6640, lng=-78.4839, popup="Luray Cavern, VA, USA") %>%
+  setView (lat=38.6640, lng=-78.4839, zoom=16)
+m  # Print the map
+
+```
